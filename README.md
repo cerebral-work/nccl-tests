@@ -356,4 +356,4 @@ Each node writes one JSON file and also prints JSON to stdout.
   kubectl logs -l job-name=scorcher-h100-64 --prefix
   ```
 
-- Slurm: the files are `$RESULTS_DIR/<hostname>.json`, with `RESULTS_DIR` defaulting to `results/<job id>` under the submit directory. The stdout is in the Slurm output file `scorcher_bench_<job id>.out`.
+- Slurm: the files are `$RESULTS_DIR/<hostname>.json` (the script passes `--output "/results/{hostname}.json"` and scorcher expands the token), with `RESULTS_DIR` defaulting to `results/<job id>` under the submit directory. The stdout is in the Slurm output file `scorcher_bench_<job id>.out`.

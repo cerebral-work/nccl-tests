@@ -56,12 +56,10 @@ mkdir -p "$RESULTS_DIR"
 echo "Using nodes: $SLURM_JOB_NODELIST"
 
 # The srun command inherits the SBATCH flags set above
-# and will be launched once on each of the 8 nodes. The sh -c wrapper makes
-# $(hostname) expand on each compute node, not once on the batch host.
-# It assumes the image ships /bin/sh.
+# and will be launched once on each of the 8 nodes. The image has no shell, so
+# scorcher expands the {hostname} token in --output itself, once per process.
 
-# shellcheck disable=SC2016  # single quotes are intended: expand on the node
 srun --container-image="$CONTAINER_IMAGE" \
      --container-mounts="$RESULTS_DIR:/results" \
      --no-container-mount-home --kill-on-bad-exit=1 \
-     sh -c 'exec /usr/local/bin/scorcher bench --iters 1000 --json --output "/results/$(hostname).json"'
+     /usr/local/bin/scorcher bench --iters 1000 --json --output "/results/{hostname}.json"
