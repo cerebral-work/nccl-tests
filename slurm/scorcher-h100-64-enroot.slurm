@@ -11,8 +11,7 @@
 # One scorcher process per node. No MPI, so no --mpi=pmix and no NCCL_/UCX_ exports.
 
 # Image: pinned by digest, pulled from the private Harbor registry.
-# TODO(scorcher): replace with the digest from `crane digest harbor.unsigned.gg/platform/scorcher:<version>` after the first publish
-scorcher_digest="sha256:0000000000000000000000000000000000000000000000000000000000000000"
+scorcher_digest="sha256:c24561a00914fa50ad7d45900786e24d5c6f961226c0b1c4331fc0541a76c048"
 
 # Enroot credentials for the private registry.
 # Enroot reads $ENROOT_CONFIG_PATH/.credentials on the node that runs `enroot import`

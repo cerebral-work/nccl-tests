@@ -30,8 +30,7 @@ spec:
           key: node.coreweave.cloud/reserved
       containers:
         - name: scorcher
-          # TODO(scorcher): replace with the digest from `crane digest harbor.unsigned.gg/platform/scorcher:<version>` after the first publish
-          image: harbor.unsigned.gg/platform/scorcher@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          image: harbor.unsigned.gg/platform/scorcher@sha256:c24561a00914fa50ad7d45900786e24d5c6f961226c0b1c4331fc0541a76c048
           args: ["bench", "--iters", "1000", "--json", "--output", "/results/$(NODE_NAME).json"]
           env:
             - name: NODE_NAME
