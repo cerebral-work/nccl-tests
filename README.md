@@ -319,3 +319,41 @@ The following runs used NCCL `2.26.2`.
 # Out of bounds values : 0 OK
 # Avg bus bandwidth    : 297.808 
 ```
+
+## scorcher
+
+`mpi-operator/scorcher-h100-64.yaml` and `slurm/scorcher-h100-64-enroot.slurm` run one scorcher process per node on 8 H100 nodes. They use the private image `harbor.unsigned.gg/platform/scorcher`. No MPI is involved, and the nccl-tests image, `run_test.py` and the existing manifests are unchanged.
+
+### Image digest pin
+
+Both files pin the image by digest and ship with an all-zero placeholder. After the first publish, get the real digest and replace the placeholder in both files:
+
+```bash
+crane digest harbor.unsigned.gg/platform/scorcher:<version>
+```
+
+### Kubernetes pull secret
+
+The Job references the pull secret `harbor-platform-pull`. Creating that secret is a namespace-level act outside this repo. It must exist in the target namespace before the Job is applied.
+
+### Slurm and enroot credentials
+
+Enroot needs a credential for Harbor on the node that runs `enroot import`. Add this netrc line to `$ENROOT_CONFIG_PATH/.credentials`:
+
+```
+machine harbor.unsigned.gg login <robot> password <token>
+```
+
+The digest import syntax (`docker://harbor.unsigned.gg#platform/scorcher@sha256:...`) is untested. Confirm it on the Slurm head node first.
+
+### Results
+
+Each node writes one JSON file and also prints JSON to stdout.
+
+- Kubernetes: the file is `/results/<node name>.json` in an `emptyDir`. Read the output with:
+
+  ```bash
+  kubectl logs -l job-name=scorcher-h100-64 --prefix
+  ```
+
+- Slurm: the files are `$RESULTS_DIR/<hostname>.json`, with `RESULTS_DIR` defaulting to `results/<job id>` under the submit directory. The stdout is in the Slurm output file `scorcher_bench_<job id>.out`.
