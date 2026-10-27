@@ -1,0 +1,79 @@
+# yamllint disable rule:line-length
+# One scorcher process per node on 8 x 8xB200 nodes (64 GPUs).
+# Indexed Job, not an MPIJob: scorcher needs no MPI ranks.
+# Resources and affinity mirror the worker block of
+# nccl-test-distributed-b200-64-mpijob.yaml so each pod owns a whole node.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scorcher-b200-64
+  labels:
+    app.kubernetes.io/name: scorcher-b200-64
+spec:
+  completionMode: Indexed
+  completions: 8
+  parallelism: 8
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scorcher-b200-64
+        metadata.coreweave.cloud/job: scorcher
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: harbor-platform-pull
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+          key: node.coreweave.cloud/reserved
+      containers:
+        - name: scorcher
+          image: harbor.unsigned.gg/platform/scorcher@sha256:c24561a00914fa50ad7d45900786e24d5c6f961226c0b1c4331fc0541a76c048
+          args: ["bench", "--iters", "1000", "--json", "--output", "/results/$(NODE_NAME).json"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+          resources:
+            requests:
+              cpu: 110
+              memory: 960Gi
+              nvidia.com/gpu: 8
+              rdma/ib: 1
+            limits:
+              memory: 960Gi
+              nvidia.com/gpu: 8
+              rdma/ib: 1
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: dshm
+            - mountPath: /results
+              name: results
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node.coreweave.cloud/type
+                    operator: In
+                    values:
+                      - b200-8x
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: scorcher-b200-64
+      volumes:
+        - emptyDir:
+            medium: Memory
+          name: dshm
+        - emptyDir: {}
+          name: results
