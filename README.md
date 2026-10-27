@@ -322,11 +322,19 @@ The following runs used NCCL `2.26.2`.
 
 ## scorcher
 
-`mpi-operator/scorcher-h100-64.yaml` and `slurm/scorcher-h100-64-enroot.slurm` run one scorcher process per node on 8 H100 nodes. They use the private image `harbor.unsigned.gg/platform/scorcher`. No MPI is involved, and the nccl-tests image, `run_test.py` and the existing manifests are unchanged.
+The scorcher files run one scorcher process per node. They use the private image `harbor.unsigned.gg/platform/scorcher`. No MPI is involved, and the nccl-tests image, `run_test.py` and the existing manifests are unchanged. Each file takes its node type, GPU count and node count from the nccl-tests example for the same GPU:
+
+| GPU | Kubernetes Job | Slurm script | Nodes (K8s / Slurm) | GPUs per node | Node type |
+| --- | --- | --- | --- | --- | --- |
+| H100 | [scorcher-h100-64.yaml](./mpi-operator/scorcher-h100-64.yaml) | [scorcher-h100-64-enroot.slurm](./slurm/scorcher-h100-64-enroot.slurm) | 8 / 8 | 8 | `gd-8xh100ib-i128` |
+| B200 | [scorcher-b200-64.yaml](./mpi-operator/scorcher-b200-64.yaml) | [scorcher-b200-64-enroot.slurm](./slurm/scorcher-b200-64-enroot.slurm) | 8 / 8 | 8 | `b200-8x` |
+| GB200 NVL72 | [scorcher-gb200-nvl72.yaml](./mpi-operator/scorcher-gb200-nvl72.yaml) | [scorcher-gb200-nvl72-enroot.slurm](./slurm/scorcher-gb200-nvl72-enroot.slurm) | 18 / 16 (`--segment=16`) | 4 | `gb200-4x` |
+
+The GB200 Job assumes a single NVL72 rack. With more than one, uncomment the `ds.coreweave.com/nvlink.domain` match expression and set it to the rack's NVLink domain.
 
 ### Image digest pin
 
-Both files pin the image by digest and ship with an all-zero placeholder. After the first publish, get the real digest and replace the placeholder in both files:
+Every file pins the image by digest (`scorcher:0.1.0`, `sha256:c24561a0...`). To move to a new release, get its digest and replace it in all of them:
 
 ```bash
 crane digest harbor.unsigned.gg/platform/scorcher:<version>
@@ -353,7 +361,7 @@ Each node writes one JSON file and also prints JSON to stdout.
 - Kubernetes: the file is `/results/<node name>.json` in an `emptyDir`. Read the output with:
 
   ```bash
-  kubectl logs -l job-name=scorcher-h100-64 --prefix
+  kubectl logs -l job-name=<job name> --prefix   # e.g. scorcher-gb200-nvl72
   ```
 
 - Slurm: the files are `$RESULTS_DIR/<hostname>.json` (the script passes `--output "/results/{hostname}.json"` and scorcher expands the token), with `RESULTS_DIR` defaulting to `results/<job id>` under the submit directory. The stdout is in the Slurm output file `scorcher_bench_<job id>.out`.
