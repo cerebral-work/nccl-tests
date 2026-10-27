@@ -1,0 +1,95 @@
+# yamllint disable rule:line-length
+# One scorcher process per node on one GB200 NVL72 rack: 18 x 4xGB200 nodes (72 GPUs).
+# Indexed Job, not an MPIJob: scorcher needs no MPI ranks.
+# Resources and affinity mirror the worker block of
+# nccl-test-distributed-gb200-nvl72-mpijob.yaml so each pod owns a whole node.
+# This assumes you have a single NVL72 rack in your cluster.
+# If you have multiple, set the nvlink.domain affinity below to pick one rack.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scorcher-gb200-nvl72
+  labels:
+    app.kubernetes.io/name: scorcher-gb200-nvl72
+spec:
+  completionMode: Indexed
+  completions: 18
+  parallelism: 18
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scorcher-gb200-nvl72
+        metadata.coreweave.cloud/job: scorcher
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: harbor-platform-pull
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+          key: node.coreweave.cloud/reserved
+      containers:
+        - name: scorcher
+          image: harbor.unsigned.gg/platform/scorcher@sha256:c24561a00914fa50ad7d45900786e24d5c6f961226c0b1c4331fc0541a76c048
+          args: ["bench", "--iters", "1000", "--json", "--output", "/results/$(NODE_NAME).json"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+          resources:
+            requests:
+              cpu: "140"
+              memory: 900Gi
+              nvidia.com/gpu: 4
+            limits:
+              cpu: "140"
+              memory: 900Gi
+              nvidia.com/gpu: 4
+              rdma/ib: 1
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: dshm
+            - mountPath: /results
+              name: results
+      affinity:
+        podAffinity:
+          # This gives the pods a preference to cluster together on the same rack
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    metadata.coreweave.cloud/job: scorcher
+                topologyKey: topology.kubernetes.io/zone
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  # Uncomment and add a value if you want to target a specific NVL72 rack
+                  # - key: ds.coreweave.com/nvlink.domain
+                  #   operator: In
+                  #   values:
+                  #     - <NVLINK_DOMAIN>
+                  - key: node.coreweave.cloud/type
+                    operator: In
+                    values:
+                      - gb200-4x
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: scorcher-gb200-nvl72
+      volumes:
+        - emptyDir:
+            medium: Memory
+          name: dshm
+        - emptyDir: {}
+          name: results
